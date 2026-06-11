@@ -158,7 +158,7 @@ public class SSLRequestHelperTest {
 
     @Test
     public void sslInfoToString_containsAllFields() {
-        SSLRequestHelper.SSLInfo info = new SSLRequestHelper.SSLInfo(null, "CN=test", "TLSv1.3", "TLS_AES_256_GCM_SHA384", null);
+        SSLRequestHelper.SSLInfo info = new SSLRequestHelper.SSLInfo(null, "CN=test", "TLSv1.3", "TLS_AES_256_GCM_SHA384", null, null, null);
 
         assertThat(info.toString(), is("SSLInfo [x509Certs=null, principal=CN=test, protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384]"));
     }

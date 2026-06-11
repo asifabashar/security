@@ -17,6 +17,7 @@
 
 package org.opensearch.security.ssl.util;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -30,16 +31,13 @@ import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Date;
-import java.util.Enumeration;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -66,13 +64,17 @@ public class SSLRequestHelper {
         private final String principal;
         private final String protocol;
         private final String cipher;
+        private final X509Certificate[] headerCerts;
+        private final String headerPrincipal;
 
         public SSLInfo(
             final X509Certificate[] x509Certs,
             final String principal,
             final String protocol,
             final String cipher,
-            X509Certificate[] localCertificates
+            X509Certificate[] localCertificates,
+            final X509Certificate[] headerCerts,
+            final String headerPrincipal
         ) {
             super();
             this.x509Certs = x509Certs;
@@ -80,6 +82,8 @@ public class SSLRequestHelper {
             this.protocol = protocol;
             this.cipher = cipher;
             this.localCertificates = localCertificates;
+            this.headerCerts =headerCerts;
+            this.headerPrincipal = headerPrincipal;
         }
 
         public X509Certificate[] getX509Certs() {
@@ -131,9 +135,38 @@ public class SSLRequestHelper {
         final SSLSession session = engine.getSession();
 
         X509Certificate[] x509Certs = null;
+        X509Certificate[] x509HeaderCerts = null;
         final String protocol = session.getProtocol();
         final String cipher = session.getCipherSuite();
         String principal = null;
+        String headerCertPrincipal = null;
+        final String clientCertHeaderName = settings.get("clientCertHeaderName","ClientCert");
+        final boolean isURLEncoded = Boolean.parseBoolean(settings.get("isURLEncoded", "true"));
+
+
+        String clientCertEncoded = request.header(clientCertHeaderName);
+        if (isURLEncoded){
+            String clientCertFromHeader = URLDecoder.decode(
+                    clientCertEncoded,
+                    StandardCharsets.UTF_8
+            );
+            byte[] decodedClientCert = Base64.getDecoder().decode(clientCertFromHeader);
+
+            CertificateFactory factory = null;
+            try {
+                factory = CertificateFactory.getInstance("X.509");
+                x509HeaderCerts = new X509Certificate[1];
+                x509HeaderCerts[0] = (X509Certificate)
+                        factory.generateCertificate(new ByteArrayInputStream( decodedClientCert));
+                headerCertPrincipal = principalExtractor == null ? null : principalExtractor.extractPrincipal(x509HeaderCerts[0], Type.HTTP);
+            } catch (CertificateException e) {
+
+            }
+
+        }
+
+
+
 
         if (engine.getNeedClientAuth() || engine.getWantClientAuth()) {
             Certificate[] certs = null;
@@ -157,7 +190,7 @@ public class SSLRequestHelper {
             localCerts = Arrays.stream(session.getLocalCertificates()).map(X509Certificate.class::cast).toArray(X509Certificate[]::new);
         }
 
-        return new SSLInfo(x509Certs, principal, protocol, cipher, localCerts);
+        return new SSLInfo(x509Certs, principal, protocol, cipher, localCerts,x509HeaderCerts,headerCertPrincipal);
     }
 
     private static void validatePeerCerts(final X509Certificate[] x509Certs, final Settings settings, final Path configPath)
