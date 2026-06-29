@@ -17,10 +17,14 @@
 
 package org.opensearch.security.ssl.util;
 
+import java.security.KeyStore;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Function;
+
+import org.bouncycastle.crypto.CryptoServicesRegistrar;
 
 import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
@@ -42,7 +46,9 @@ public final class SSLConfigConstants {
     public static final String ENABLED = "enabled";
     public static final String CLIENT_AUTH_MODE = "clientauth_mode";
     public static final String ENFORCE_CERT_RELOAD_DN_VERIFICATION = "enforce_cert_reload_dn_verification";
-    public static final String DEFAULT_STORE_TYPE = "JKS";
+    public static final String DEFAULT_STORE_TYPE = CryptoServicesRegistrar.isInApprovedOnlyMode()
+        ? "BCFKS"
+        : KeyStore.getDefaultType().toUpperCase(Locale.ROOT);
     public static final String SSL_PREFIX = "plugins.security.ssl.";
 
     public static final String KEYSTORE_TYPE = "keystore_type";
@@ -64,6 +70,8 @@ public final class SSLConfigConstants {
     public static final String ENABLED_PROTOCOLS = "enabled_protocols";
     public static final String ENABLED_CIPHERS = "enabled_ciphers";
     public static final String PEM_KEY_PASSWORD = "pemkey_password";
+    public static final String ROLE_FROM_HEADER_CERT = "clientauth_resolve_role_from_header_cert";
+    public static final String ROLE_FROM_HEADER_CERT_NAME = "clientauth_resolve_role_from_header_cert_name";
 
     /**
      * HTTP transport security settings
@@ -93,7 +101,8 @@ public final class SSLConfigConstants {
     public static final String SECURITY_SSL_HTTP_ENFORCE_CERT_RELOAD_DN_VERIFICATION = SSL_HTTP_PREFIX
         + ENFORCE_CERT_RELOAD_DN_VERIFICATION;
     public static final String SECURITY_SSL_HTTP_PEMTRUSTEDCAS_FILEPATH = SSL_HTTP_PREFIX + PEM_TRUSTED_CAS_FILEPATH;
-
+    public static final String SECURITY_SSL_HTTP_ROLE_FROM_HEADER_CERT = SSL_HTTP_PREFIX + ROLE_FROM_HEADER_CERT;
+    public static final String SECURITY_SSL_HTTP_ROLE_FROM_HEADER_CERT_NAME = SSL_HTTP_PREFIX + ROLE_FROM_HEADER_CERT_NAME;
     // http cert revocation list settings
     public static final String SECURITY_SSL_HTTP_CRL_FILE = SSL_HTTP_CRL_PREFIX + "file_path";
     public static final String SECURITY_SSL_HTTP_CRL_VALIDATE = SSL_HTTP_CRL_PREFIX + "validate";
