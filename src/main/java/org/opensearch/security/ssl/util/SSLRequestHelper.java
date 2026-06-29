@@ -160,16 +160,14 @@ public class SSLRequestHelper {
         headerNamesMap.forEach((headerName, headerValue) -> log.info(headerName + ": " + String.join(" ", headerValue)));
 
         final String clientCertHeaderName = settings.get("clientCertHeaderName", "x-client-cert");
-        final boolean isURLEncoded = Boolean.parseBoolean(settings.get("isClientCertURLEncoded", "true"));
+        final boolean allowHeaderCertAuth = Boolean.parseBoolean(settings.get("plugins.security.ssl.http.clientauth_from_header", "true"));
 
         String clientCert = request.header(clientCertHeaderName);
-        if (clientCert != null) {
+        if (clientCert != null && allowHeaderCertAuth) {
 
-            if (isURLEncoded) {
-                log.trace("Client Cert Encoded : {} ", clientCert);
-                clientCert = URLDecoder.decode(clientCert, StandardCharsets.UTF_8);
-                log.trace("Client Cert From Header : {} ", clientCert);
-            }
+            log.trace("Client Cert Encoded : {} ", clientCert);
+            clientCert = URLDecoder.decode(clientCert, StandardCharsets.UTF_8);
+            log.trace("Client Cert From Header : {} ", clientCert);
 
             byte[] decodedClientCert = clientCert.getBytes(StandardCharsets.UTF_8);
 
