@@ -69,7 +69,12 @@ public class CertificateAuthenticationTest {
 
     @ClassRule
     public static final LocalCluster cluster = new LocalCluster.Builder().nodeSettings(
-        Map.of("plugins.security.ssl.http.clientauth_mode", "OPTIONAL")
+        Map.of(
+            "plugins.security.ssl.http.clientauth_mode",
+            "OPTIONAL",
+            "plugins.security.ssl.http.clientauth_resolve_role_from_header_cert",
+            "true"
+        )
     )
         .clusterManager(ClusterManager.THREE_CLUSTER_MANAGERS)
         .anonymousAuth(false)
