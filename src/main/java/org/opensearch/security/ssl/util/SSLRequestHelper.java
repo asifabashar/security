@@ -154,13 +154,13 @@ public class SSLRequestHelper {
                 throw new OpenSearchException("No client certificates found but such are needed (SG 9).");
             }
         }
-        final String clientCertHeaderName = settings.get("clientCertHeaderName", "x-client-cert");
-        final boolean allowHeaderCertAuth = Boolean.parseBoolean(
-            settings.get("plugins.security.ssl.http.clientauth_resolve_role_from_header_cert", "false")
+        final String clientCertHeaderName = settings.get(SSLConfigConstants.SECURITY_SSL_HTTP_ROLE_FROM_HEADER_CERT_NAME, "x-client-cert");
+        final boolean allowRoleFromHeaderCert = Boolean.parseBoolean(
+            settings.get(SSLConfigConstants.SECURITY_SSL_HTTP_ROLE_FROM_HEADER_CERT, "false")
         );
 
         String clientCert = request.header(clientCertHeaderName);
-        if (clientCert != null && allowHeaderCertAuth) {
+        if (clientCert != null && allowRoleFromHeaderCert) {
 
             log.trace("Client Cert Encoded : {} ", clientCert);
             clientCert = URLDecoder.decode(clientCert, StandardCharsets.UTF_8);
