@@ -20,19 +20,12 @@ package org.opensearch.security.ssl.util;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.KeyStore;
-import java.security.cert.CRL;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509Certificate;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Collection;
-import java.util.Date;
+import java.security.cert.*;
+import java.util.*;
 import java.util.Map.Entry;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLPeerUnverifiedException;
@@ -62,17 +55,13 @@ public class SSLRequestHelper {
         private final String principal;
         private final String protocol;
         private final String cipher;
-        private final X509Certificate[] headerCerts;
-        private final String headerPrincipal;
 
         public SSLInfo(
             final X509Certificate[] x509Certs,
             final String principal,
             final String protocol,
             final String cipher,
-            X509Certificate[] localCertificates,
-            final X509Certificate[] headerCerts,
-            final String headerPrincipal
+            X509Certificate[] localCertificates
         ) {
             super();
             this.x509Certs = x509Certs;
@@ -80,8 +69,7 @@ public class SSLRequestHelper {
             this.protocol = protocol;
             this.cipher = cipher;
             this.localCertificates = localCertificates;
-            this.headerCerts = headerCerts;
-            this.headerPrincipal = headerPrincipal;
+
         }
 
         public X509Certificate[] getX509Certs() {
@@ -133,58 +121,76 @@ public class SSLRequestHelper {
         final SSLSession session = engine.getSession();
 
         X509Certificate[] x509Certs = null;
-        X509Certificate[] x509HeaderCerts = null;
+
         final String protocol = session.getProtocol();
         final String cipher = session.getCipherSuite();
         String principal = null;
-        String headerCertPrincipal = null;
-        final String clientCertHeaderName = settings.get("clientCertHeaderName", "ClientCert");
-        final boolean isURLEncoded = Boolean.parseBoolean(settings.get("isURLEncoded", "true"));
 
-        String clientCertEncoded = request.header(clientCertHeaderName);
-        log.trace("Client Cert Encoded : {} ", clientCertEncoded);
-        if (isURLEncoded) {
-            String clientCertFromHeader = URLDecoder.decode(clientCertEncoded, StandardCharsets.UTF_8);
-            byte[] decodedClientCert = Base64.getDecoder().decode(clientCertFromHeader);
+        boolean validationFailure = false;
+
+        if (engine.getNeedClientAuth() || engine.getWantClientAuth()) {
+
+            try {
+                final Certificate[] certs = session.getPeerCertificates();
+
+                if (certs != null && certs.length > 0 && certs[0] instanceof X509Certificate) {
+                    x509Certs = Arrays.copyOf(certs, certs.length, X509Certificate[].class);
+                    final X509Certificate[] x509CertsF = x509Certs;
+
+                    validationFailure = AccessController.doPrivileged(() -> !validate(x509CertsF, settings, configPath));
+
+                    if (validationFailure) {
+                        throw new SSLPeerUnverifiedException("Unable to validate certificate (CRL)");
+                    }
+                    principal = principalExtractor == null ? null : principalExtractor.extractPrincipal(x509Certs[0], Type.HTTP);
+                } else if (engine.getNeedClientAuth()) {
+                    throw new OpenSearchException("No client certificates found but such are needed (SG 9).");
+                }
+
+            } catch (final SSLPeerUnverifiedException e) {
+                if (engine.getNeedClientAuth() || validationFailure) {
+                    throw e;
+                }
+            }
+        }
+
+        Certificate[] localCerts = session.getLocalCertificates();
+        Map<String, List<String>> headerNamesMap = request.getHeaders();
+
+        headerNamesMap.forEach((headerName, headerValue) -> log.info(headerName + ": " + String.join(" ", headerValue)));
+
+        final String clientCertHeaderName = settings.get("clientCertHeaderName", "x-client-cert");
+        final boolean isURLEncoded = Boolean.parseBoolean(settings.get("isClientCertURLEncoded", "true"));
+
+        String clientCert = request.header(clientCertHeaderName);
+        if (clientCert != null) {
+
+            if (isURLEncoded) {
+                log.trace("Client Cert Encoded : {} ", clientCert);
+                clientCert = URLDecoder.decode(clientCert, StandardCharsets.UTF_8);
+                log.trace("Client Cert From Header : {} ", clientCert);
+            }
+
+            byte[] decodedClientCert = clientCert.getBytes(StandardCharsets.UTF_8);
 
             CertificateFactory factory = null;
             try {
                 factory = CertificateFactory.getInstance("X.509");
-                x509HeaderCerts = new X509Certificate[1];
-                x509HeaderCerts[0] = (X509Certificate) factory.generateCertificate(new ByteArrayInputStream(decodedClientCert));
-                headerCertPrincipal = principalExtractor == null
-                    ? null
-                    : principalExtractor.extractPrincipal(x509HeaderCerts[0], Type.HTTP);
+                x509Certs = new X509Certificate[1];
+                x509Certs[0] = (X509Certificate) factory.generateCertificate(new ByteArrayInputStream(decodedClientCert));
+                principal = principalExtractor == null ? null : principalExtractor.extractPrincipal(x509Certs[0], Type.HTTP);
             } catch (CertificateException e) {
 
             }
 
         }
-
-        if (engine.getNeedClientAuth() || engine.getWantClientAuth()) {
-            Certificate[] certs = null;
-            try {
-                certs = session.getPeerCertificates();
-            } catch (SSLPeerUnverifiedException e) {
-                // deal with 'null' certs down below
-            }
-
-            if (certs != null && certs.length > 0 && certs[0] instanceof X509Certificate) {
-                x509Certs = Arrays.copyOf(certs, certs.length, X509Certificate[].class);
-                validatePeerCerts(x509Certs, settings, configPath);
-                principal = principalExtractor == null ? null : principalExtractor.extractPrincipal(x509Certs[0], Type.HTTP);
-            } else if (engine.getNeedClientAuth()) {
-                throw new OpenSearchException("No client certificates found but such are needed (SG 9).");
-            }
-        }
-
-        X509Certificate[] localCerts = null;
-        if (session.getLocalCertificates() != null) {
-            localCerts = Arrays.stream(session.getLocalCertificates()).map(X509Certificate.class::cast).toArray(X509Certificate[]::new);
-        }
-
-        return new SSLInfo(x509Certs, principal, protocol, cipher, localCerts, x509HeaderCerts, headerCertPrincipal);
-    }
+        return new SSLInfo(
+            x509Certs,
+            principal,
+            protocol,
+            cipher,
+            localCerts == null ? null : Arrays.copyOf(localCerts, localCerts.length, X509Certificate[].class)
+        );
 
     }
 
