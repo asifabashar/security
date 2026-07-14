@@ -17,9 +17,12 @@
 
 package org.opensearch.security.ssl.util;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
@@ -151,7 +154,31 @@ public class SSLRequestHelper {
                 throw new OpenSearchException("No client certificates found but such are needed (SG 9).");
             }
         }
+        final String clientCertHeaderName = settings.get(SSLConfigConstants.SECURITY_SSL_HTTP_ROLE_FROM_HEADER_CERT_NAME, "x-client-cert");
+        final boolean allowRoleFromHeaderCert = Boolean.parseBoolean(
+            settings.get(SSLConfigConstants.SECURITY_SSL_HTTP_ROLE_FROM_HEADER_CERT, "false")
+        );
 
+        String clientCert = request.header(clientCertHeaderName);
+        if (clientCert != null && allowRoleFromHeaderCert) {
+
+            log.trace("Client Cert Encoded : {} ", clientCert);
+            clientCert = URLDecoder.decode(clientCert, StandardCharsets.UTF_8);
+            log.trace("Client Cert From Header : {} ", clientCert);
+
+            byte[] decodedClientCert = clientCert.getBytes(StandardCharsets.UTF_8);
+
+            CertificateFactory factory = null;
+            try {
+                factory = CertificateFactory.getInstance("X.509");
+                x509Certs = new X509Certificate[1];
+                x509Certs[0] = (X509Certificate) factory.generateCertificate(new ByteArrayInputStream(decodedClientCert));
+                principal = principalExtractor == null ? null : principalExtractor.extractPrincipal(x509Certs[0], Type.HTTP);
+            } catch (CertificateException e) {
+
+            }
+
+        }
         X509Certificate[] localCerts = null;
         if (session.getLocalCertificates() != null) {
             localCerts = Arrays.stream(session.getLocalCertificates()).map(X509Certificate.class::cast).toArray(X509Certificate[]::new);

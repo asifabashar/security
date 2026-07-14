@@ -70,6 +70,8 @@ public final class SSLConfigConstants {
     public static final String ENABLED_PROTOCOLS = "enabled_protocols";
     public static final String ENABLED_CIPHERS = "enabled_ciphers";
     public static final String PEM_KEY_PASSWORD = "pemkey_password";
+    public static final String ROLE_FROM_HEADER_CERT = "clientauth_resolve_role_from_header_cert";
+    public static final String ROLE_FROM_HEADER_CERT_NAME = "clientauth_resolve_role_from_header_cert_name";
 
     /**
      * HTTP transport security settings
@@ -99,7 +101,8 @@ public final class SSLConfigConstants {
     public static final String SECURITY_SSL_HTTP_ENFORCE_CERT_RELOAD_DN_VERIFICATION = SSL_HTTP_PREFIX
         + ENFORCE_CERT_RELOAD_DN_VERIFICATION;
     public static final String SECURITY_SSL_HTTP_PEMTRUSTEDCAS_FILEPATH = SSL_HTTP_PREFIX + PEM_TRUSTED_CAS_FILEPATH;
-
+    public static final String SECURITY_SSL_HTTP_ROLE_FROM_HEADER_CERT = SSL_HTTP_PREFIX + ROLE_FROM_HEADER_CERT;
+    public static final String SECURITY_SSL_HTTP_ROLE_FROM_HEADER_CERT_NAME = SSL_HTTP_PREFIX + ROLE_FROM_HEADER_CERT_NAME;
     // http cert revocation list settings
     public static final String SECURITY_SSL_HTTP_CRL_FILE = SSL_HTTP_CRL_PREFIX + "file_path";
     public static final String SECURITY_SSL_HTTP_CRL_VALIDATE = SSL_HTTP_CRL_PREFIX + "validate";
