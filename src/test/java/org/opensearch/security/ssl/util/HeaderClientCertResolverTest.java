@@ -60,6 +60,7 @@ public class HeaderClientCertResolverTest {
         return URLEncoder.encode(pem, StandardCharsets.UTF_8);
     }
 
+    /** Request with Header **/
     private static SecurityRequest requestWithHeader(String name, String value) {
         return new FakeRestRequest(Map.of(name, value), Collections.emptyMap()).asSecurityRequest();
     }
